@@ -81,6 +81,7 @@ public class FailoverReactor implements Closeable {
     private static final long DAY_PERIOD_MINUTES = 24 * 60;
     
     /**
+     * 初始化了3个定时任务
      * Init.
      */
     public void init() {
@@ -133,7 +134,13 @@ public class FailoverReactor implements Closeable {
         ThreadUtils.shutdownThreadPool(executorService, NAMING_LOGGER);
         NAMING_LOGGER.info("{} do shutdown stop", className);
     }
-    
+
+    /**
+     * 首先判定下容灾开关是否有，容灾开关是一个磁盘文件的形式存在，通过容灾开关文件名字，
+     * 判定容灾开关是否打开，1表示打开，0为关闭，读取到容灾开关后，将值更新到内存中，
+     * 后续解析地址列表时，首先会判定一下容灾开关是否打开，如果打开了，
+     * 就读缓存的数据，否则从服务端获取最新数据。
+     */
     class SwitchRefresher implements Runnable {
         
         long lastModifiedMillis = 0L;
@@ -247,7 +254,11 @@ public class FailoverReactor implements Closeable {
             }
         }
     }
-    
+
+    /**
+     * 每隔24小时，把内存中所有的服务数据，写一遍到磁盘中，
+     * 其中需要过滤掉一些非域名数据的特殊数据，具体可看代码中的描述。最后
+     */
     class DiskFileWriter extends TimerTask {
         
         @Override

@@ -161,7 +161,11 @@ public class BeatReactor implements Closeable {
         ThreadUtils.shutdownThreadPool(executorService, NAMING_LOGGER);
         NAMING_LOGGER.info("{} do shutdown stop", className);
     }
-    
+
+    /**
+     * 这里就是naocs的客户端主动上报服务健康状况的逻辑了，是服务发现功能，
+     * 比较重要的一个概念，服务健康检查机制，常用的还有服务端主动去探测客户端的接口返回。
+     */
     class BeatTask implements Runnable {
         
         BeatInfo beatInfo;
