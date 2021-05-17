@@ -55,5 +55,31 @@ HttpHealthCheckProcessor->process()->HttpHealthCheckCallback
 MysqlHealthCheckProcessor->process()
 
 #### Nacos 源码分析 —— Raft 如何心跳保持
+1.raft的一个基本逻辑是leader隔一段时间给所有的follower发心跳。如果follower长时间没收到心跳，
+就认为leader已经挂了，就发起投票选举新的leader。
+    * HeartBeat 就是leader的心跳定时任务
+    * MasterElection 就是follower长时间没收到心跳就选举的定时任务
+2.HeartBeat的sendBeat就是具体发送心跳信息了
+    * follower收到心跳请求的时候(/beat())
+3.receivedBeat 方法会执行 resetLeaderDue();
+4.MasterElection里面follower就是根据这个变量判断是否要重新选leader的。
 
+RaftCore->init()->/beat->receivedBeat()->MasterElection
 
+### Nacos 源码分析 —— Raft 如何选举
+1.发起请求：
+2.其他节点收到选举请求
+3.如果对方的term比自己小，voteFor为自己，然后返回结果。意思是我自己更适合做leader，这一票我投给自己。
+4.如果对方的term比自己大，设置voteFor为对方，然后返回结果，意思是就按你说的做，这一票就投给你了。
+5.把所有的节点投票信息放到TreeBag，这个可以看成是个按value排序的有序map。排第一的就是得票最多的节点
+6.假如一个节点选举自己成功，他会认为自己是leader，就会定时发送心跳给其他的节点，这个时候其他节点的leader还是旧的，收到心跳会报错的。
+7.所以其他节点都经历一次选举：
+8.因为已经选举成功过，所以local.voteFor都有值，为上一次选举成功的节点，所以其他节点选举的结果都会统一了。
+9.但是这里有个关键逻辑就是term的比较，这个是决定了所有的逻辑的。
+10.假如节点2开始选举，它的term是最高的，选举自己是可以成功的。
+11.假如节点2和节点3同时选举呢，节点2得到自己和节点4的票，节点3得到自己和节点5的票。这个时候两边都不能成功。所以等待下一轮，因为下一次开始的时间是随机的，所以同时的概率很小。谁先，谁就是新的leader了。
+12.假如所有的节点的term相同，其实是选举不出leader的，因为都只有自己一票。这个是怎么解决的呢？
+13.收到投票请求的时候，如果对方的term比自己的大，为什么要放弃这一轮的发起选举
+14.为什么每次发布新的内容，term都会加100呢
+
+RaftCore->init()->/beat->receivedBeat()->MasterElection->/vote

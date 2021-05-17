@@ -176,6 +176,7 @@ public class RaftPeerSet extends MemberChangeListener implements Closeable {
     }
     
     /**
+     * 计算并确定哪个同行是领导者。如果有新同辈的票数超过一半，则将领导者换成新同伴
      * Calculate and decide which peer is leader. If has new peer has more than half vote, change leader to new peer.
      *
      * @param candidate new candidate
@@ -204,8 +205,12 @@ public class RaftPeerSet extends MemberChangeListener implements Closeable {
             peer.state = RaftPeer.State.LEADER;
             
             if (!Objects.equals(leader, peer)) {
+
+                // 把所有的节点投票信息放到RaftPeer，这个可以看成是个按value排序的有序map。排第一的就是得票最多的节点
                 leader = peer;
+
                 ApplicationUtils.publishEvent(new LeaderElectFinishedEvent(this, leader, local()));
+
                 Loggers.RAFT.info("{} has become the LEADER", leader.ip);
             }
         }
@@ -294,6 +299,7 @@ public class RaftPeerSet extends MemberChangeListener implements Closeable {
     }
     
     public int majorityCount() {
+        // 超过半数，表示选举新的leader成功。
         return peers.size() / 2 + 1;
     }
     

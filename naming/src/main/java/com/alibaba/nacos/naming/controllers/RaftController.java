@@ -84,6 +84,10 @@ public class RaftController {
     }
     
     /**
+     * 选举
+     * 如果对方的term比自己小，voteFor为自己，然后返回结果。意思是我自己更适合做leader，这一票我投给自己。
+     * 如果对方的term比自己大，设置voteFor为对方，然后返回结果，意思是就按你说的做，这一票就投给你了。
+     *
      * Raft vote api.
      *
      * @param request  http request
@@ -102,6 +106,8 @@ public class RaftController {
     }
     
     /**
+     * follower收到心跳请求的时候
+     *
      * Beat api.
      *
      * @param request  http request
@@ -119,7 +125,8 @@ public class RaftController {
         value = URLDecoder.decode(value, "UTF-8");
         
         JsonNode json = JacksonUtils.toObj(value);
-        
+
+        // receivedBeat 方法会执行 resetLeaderDue(),follower就是根据这个变量判断是否要重新选leader的。
         RaftPeer peer = raftCore.receivedBeat(JacksonUtils.toObj(json.get("beat").asText()));
         
         return JacksonUtils.transferToJsonNode(peer);

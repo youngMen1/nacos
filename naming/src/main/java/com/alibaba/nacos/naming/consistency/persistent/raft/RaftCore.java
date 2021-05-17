@@ -169,8 +169,11 @@ public class RaftCore implements Closeable {
         initialized = true;
         
         Loggers.RAFT.info("finish to load data from disk, cost: {} ms.", (System.currentTimeMillis() - start));
-        
+
+        // MasterElection 就是follower长时间没收到心跳就选举的定时任务
         masterTask = GlobalExecutor.registerMasterElection(new MasterElection());
+
+        // eartBeat 就是leader的心跳定时任务
         heartbeatTask = GlobalExecutor.registerHeartbeat(new HeartBeat());
         
         versionJudgement.registerObserver(isAllNewVersion -> {
@@ -387,6 +390,8 @@ public class RaftCore implements Closeable {
         datums.put(datum.key, datum);
         
         if (isLeader()) {
+            // 每次发起投票都term都会加1，如果发布内容也是加一的话，内容落后的节点第二次发起投票的时候就是加2了，term居然高过内容最新的节点。这个时候就不对了。
+            //100其实就是允许重新发起投票的次数，这个数字越大越安全，100这个数字已经足够大了，100轮投票都产生不了leader，这个概率可以忽略不计了。
             local.term.addAndGet(PUBLISH_TERM_INCREASE_COUNT);
         } else {
             if (local.term.get() + PUBLISH_TERM_INCREASE_COUNT > source.term.get()) {
@@ -481,6 +486,8 @@ public class RaftCore implements Closeable {
                 }
                 
                 RaftPeer local = peers.local();
+
+                // follower就是根据这个变量判断是否要重新选leader的。
                 local.leaderDueMs -= GlobalExecutor.TICK_PERIOD_MS;
                 
                 if (local.leaderDueMs > 0) {
@@ -490,14 +497,18 @@ public class RaftCore implements Closeable {
                 // reset timeout
                 local.resetLeaderDue();
                 local.resetHeartbeatDue();
-                
+
+                // 发送投票
                 sendVote();
             } catch (Exception e) {
                 Loggers.RAFT.warn("[RAFT] error while master election {}", e);
             }
             
         }
-        
+
+        /**
+         * 重新选举
+         */
         private void sendVote() {
             
             RaftPeer local = peers.get(NetUtils.localServer());
@@ -505,7 +516,7 @@ public class RaftCore implements Closeable {
                     local.term);
             
             peers.reset();
-            
+            // 每次发起投票的时候都会给自己的term加1 ，是这里制造term的差异的
             local.term.incrementAndGet();
             local.voteFor = local.ip;
             local.state = RaftPeer.State.CANDIDATE;
@@ -513,6 +524,7 @@ public class RaftCore implements Closeable {
             Map<String, String> params = new HashMap<>(1);
             params.put("vote", JacksonUtils.toJson(local));
             for (final String server : peers.allServersWithoutMySelf()) {
+                // 选举请求
                 final String url = buildUrl(server, API_VOTE);
                 try {
                     HttpClient.asyncHttpPost(url, null, params, new Callback<String>() {
@@ -526,7 +538,8 @@ public class RaftCore implements Closeable {
                             RaftPeer peer = JacksonUtils.toObj(result.getData(), RaftPeer.class);
                             
                             Loggers.RAFT.info("received approve from peer: {}", JacksonUtils.toJson(peer));
-                            
+
+                            // 发起投票的节点收集到回应之后就开始处理了：
                             peers.decideLeader(peer);
                             
                         }
@@ -549,6 +562,8 @@ public class RaftCore implements Closeable {
     }
     
     /**
+     * 获得投票
+     *
      * Received vote.
      *
      * @param remote remote raft peer of vote information
@@ -573,7 +588,8 @@ public class RaftCore implements Closeable {
             
             return local;
         }
-        
+        // 这个是为了减少选举冲突。对方比自己的term大1，自己不放弃这一轮选举的话，
+        // 自己发起选举，term会加1，其实term就一样大了，可能的结果就是两个都选举不成功。
         local.resetLeaderDue();
         
         local.state = RaftPeer.State.FOLLOWER;

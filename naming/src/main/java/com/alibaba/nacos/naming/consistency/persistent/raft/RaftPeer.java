@@ -45,6 +45,7 @@ public class RaftPeer {
     public volatile State state = State.FOLLOWER;
     
     public void resetLeaderDue() {
+        // 随机的区间就是0-5000 ms
         leaderDueMs = GlobalExecutor.LEADER_TIMEOUT_MS + RandomUtils.nextLong(0, GlobalExecutor.RANDOM_MS);
     }
     
