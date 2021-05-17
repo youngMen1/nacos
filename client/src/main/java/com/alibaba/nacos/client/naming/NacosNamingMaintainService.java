@@ -66,6 +66,7 @@ public class NacosNamingMaintainService implements NamingMaintainService {
         ServerListManager serverListManager = new ServerListManager(properties);
         SecurityProxy securityProxy = new SecurityProxy(properties,
                 NamingHttpClientManager.getInstance().getNacosRestTemplate());
+        //  创建一个BeatReactor
         serverProxy = new NamingHttpClientProxy(namespace, securityProxy, serverListManager, properties, null);
     }
     

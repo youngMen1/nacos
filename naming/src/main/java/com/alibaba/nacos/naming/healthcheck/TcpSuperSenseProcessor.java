@@ -49,6 +49,8 @@ import java.util.concurrent.TimeUnit;
 import static com.alibaba.nacos.naming.misc.Loggers.SRV_LOG;
 
 /**
+ * TCP健康状况检查处理器
+ *
  * TCP health check processor.
  *
  * @author nacos
@@ -393,14 +395,16 @@ public class TcpSuperSenseProcessor implements HealthCheckProcessor, Runnable {
                 
                 Cluster cluster = beat.getTask().getCluster();
                 int port = cluster.isUseIPPort4Check() ? instance.getPort() : cluster.getDefCkport();
+                // 创建连接
                 channel.connect(new InetSocketAddress(instance.getIp(), port));
-                
+
                 SelectionKey key = channel.register(selector, SelectionKey.OP_CONNECT | SelectionKey.OP_READ);
                 key.attach(beat);
                 keyMap.put(beat.toString(), new BeatKey(key));
                 
                 beat.setStartTime(System.currentTimeMillis());
-                
+
+                // 创建连接，500ms后看连接是否创建成功   TimeOutTask
                 GlobalExecutor
                         .scheduleTcpSuperSenseTask(new TimeOutTask(key), CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             } catch (Exception e) {

@@ -120,6 +120,7 @@ public class Service extends com.alibaba.nacos.api.naming.pojo.Service implement
     }
     
     /**
+     * 先看如何处理http心跳请求
      * Process client beat.
      *
      * @param rsInfo metrics info of server

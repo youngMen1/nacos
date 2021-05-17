@@ -43,6 +43,8 @@ import java.util.concurrent.TimeUnit;
 import static com.alibaba.nacos.client.utils.LogUtils.NAMING_LOGGER;
 
 /**
+ * 心跳反应
+ *
  * Beat reactor.
  *
  * @author harold
@@ -181,6 +183,7 @@ public class BeatReactor implements Closeable {
             }
             long nextTime = beatInfo.getPeriod();
             try {
+                // 发送心跳
                 JsonNode result = serverProxy.sendBeat(beatInfo, BeatReactor.this.lightBeatEnabled);
                 long interval = result.get("clientBeatInterval").asLong();
                 boolean lightBeatEnabled = false;

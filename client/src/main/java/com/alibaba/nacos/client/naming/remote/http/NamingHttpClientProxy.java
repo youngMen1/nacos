@@ -65,6 +65,7 @@ import java.util.Set;
 import static com.alibaba.nacos.client.utils.LogUtils.NAMING_LOGGER;
 
 /**
+ * 服务发现 代理
  * Naming proxy.
  *
  * @author nkorange
@@ -93,6 +94,7 @@ public class NamingHttpClientProxy extends AbstractNamingClientProxy {
         this.serverListManager = serverListManager;
         this.setServerPort(DEFAULT_SERVER_PORT);
         this.namespaceId = namespaceId;
+        // 创建一个BeatReactor
         this.beatReactor = new BeatReactor(this, properties);
         this.pushReceiver = new PushReceiver(serviceInfoHolder);
         this.maxRetry = ConvertUtils.toInt(properties.getProperty(PropertyKeyConst.NAMING_REQUEST_DOMAIN_RETRY_COUNT,
@@ -243,6 +245,7 @@ public class NamingHttpClientProxy extends AbstractNamingClientProxy {
     }
     
     /**
+     * 发送心跳
      * Send beat.
      *
      * @param beatInfo         beat info

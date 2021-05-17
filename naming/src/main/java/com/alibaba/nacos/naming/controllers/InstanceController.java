@@ -347,6 +347,8 @@ public class InstanceController {
     }
     
     /**
+     * 先看如何处理http心跳请求
+     *
      * Create a beat for instance.
      *
      * @param request http request

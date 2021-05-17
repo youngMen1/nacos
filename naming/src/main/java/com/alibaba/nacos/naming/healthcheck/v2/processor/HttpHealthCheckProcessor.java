@@ -49,21 +49,21 @@ import static com.alibaba.nacos.naming.misc.Loggers.SRV_LOG;
  */
 @Component
 public class HttpHealthCheckProcessor implements HealthCheckProcessorV2 {
-    
+
     public static final String TYPE = HealthCheckType.HTTP.name();
-    
+
     private static final NacosAsyncRestTemplate ASYNC_REST_TEMPLATE = HttpClientManager
             .getProcessorNacosAsyncRestTemplate();
-    
+
     private final HealthCheckCommonV2 healthCheckCommon;
-    
+
     private final SwitchDomain switchDomain;
-    
+
     public HttpHealthCheckProcessor(HealthCheckCommonV2 healthCheckCommon, SwitchDomain switchDomain) {
         this.healthCheckCommon = healthCheckCommon;
         this.switchDomain = switchDomain;
     }
-    
+
     @Override
     public void process(HealthCheckTaskV2 task, Service service, ClusterMetadata metadata) {
         HealthCheckInstancePublishInfo instance = (HealthCheckInstancePublishInfo) task.getClient()
@@ -80,15 +80,17 @@ public class HttpHealthCheckProcessor implements HealthCheckProcessorV2 {
                         .reEvaluateCheckRT(task.getCheckRtNormalized() * 2, task, switchDomain.getHttpHealthParams());
                 return;
             }
-            
+
             Http healthChecker = (Http) metadata.getHealthChecker();
             int ckPort = metadata.isUseInstancePortForCheck() ? instance.getPort() : metadata.getHealthyCheckPort();
+            // 发一个http请求，看返回码是不是200
             URL host = new URL("http://" + instance.getIp() + ":" + ckPort);
             URL target = new URL(host, healthChecker.getPath());
             Map<String, String> customHeaders = healthChecker.getCustomHeaders();
             Header header = Header.newInstance();
             header.addAll(customHeaders);
-            
+
+            // 异步发送
             ASYNC_REST_TEMPLATE.get(target.toString(), header, Query.EMPTY, String.class,
                     new HttpHealthCheckCallback(instance, task, service));
             MetricsMonitor.getHttpHealthCheckMonitor().incrementAndGet();
@@ -99,33 +101,39 @@ public class HttpHealthCheckProcessor implements HealthCheckProcessorV2 {
                     switchDomain.getHttpHealthParams());
         }
     }
-    
+
     @Override
     public String getType() {
         return TYPE;
     }
-    
+
     private class HttpHealthCheckCallback implements Callback<String> {
-        
+
         private final HealthCheckTaskV2 task;
-        
+
         private final Service service;
-        
+
         private final HealthCheckInstancePublishInfo instance;
-        
+
         private long startTime = System.currentTimeMillis();
-        
+
         public HttpHealthCheckCallback(HealthCheckInstancePublishInfo instance, HealthCheckTaskV2 task,
-                Service service) {
+                                       Service service) {
             this.instance = instance;
             this.task = task;
             this.service = service;
         }
-        
+
+        /**
+         * 收到
+         *
+         * @param result {@link RestResult}
+         */
         @Override
         public void onReceive(RestResult<String> result) {
             instance.setCheckRt(System.currentTimeMillis() - startTime);
             int httpCode = result.getCode();
+            // 看返回码是不是200
             if (HttpURLConnection.HTTP_OK == httpCode) {
                 healthCheckCommon.checkOk(task, service, "http:" + httpCode);
                 healthCheckCommon.reEvaluateCheckRT(System.currentTimeMillis() - startTime, task,
@@ -143,7 +151,7 @@ public class HttpHealthCheckProcessor implements HealthCheckProcessorV2 {
                         switchDomain.getHttpHealthParams());
             }
         }
-        
+
         @Override
         public void onError(Throwable throwable) {
             Throwable cause = throwable;
@@ -158,7 +166,7 @@ public class HttpHealthCheckProcessor implements HealthCheckProcessorV2 {
                 }
                 cause = cause.getCause();
             }
-            
+
             // connection error, probably not reachable
             if (throwable instanceof ConnectException) {
                 healthCheckCommon.checkFailNow(task, service, "http:unable2connect:" + throwable.getMessage());
@@ -168,10 +176,10 @@ public class HttpHealthCheckProcessor implements HealthCheckProcessorV2 {
             healthCheckCommon.reEvaluateCheckRT(switchDomain.getHttpHealthParams().getMax(), task,
                     switchDomain.getHttpHealthParams());
         }
-        
+
         @Override
         public void onCancel() {
-        
+
         }
     }
 }
